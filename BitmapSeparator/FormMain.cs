@@ -15,21 +15,21 @@ namespace BitmapSeparator
         private static Color COLOR_INACTIVE_PIXEL = Color.FromArgb(255, 255, 255);
         private static Brush BRUSH_INACTIVE_AREA = new SolidBrush(COLOR_INACTIVE_PIXEL);
         // The range at which active neighbor pixels are detected
-        private const int NEIGHBOR_PIXEL_DETECTION_RANGE = 8;
+        private const int NEIGHBOR_PIXEL_DETECTION_RANGE = 2;
         // The lowest possible area considered to be a valid sub-bitmap
         // Used to prevent undesired small sub-bitmap from appearing
-        private const int DIGIT_BOUNDARIES_THRESHOLD_AREA = 32;
+        private static int DIGIT_BOUNDARIES_AREA_THRESHOLD;
         // How much is the sub-bitmap area supposed to be inflated once confirmed to be valid
-        private const int DIGIT_AREA_INFLATION_X = 8;
-        private const int DIGIT_AREA_INFLATION_Y = 8;
+        private const int DIGIT_AREA_INFLATION_X = 2;
+        private const int DIGIT_AREA_INFLATION_Y = 2;
         // Determines the resolution of the output sub-bitmaps
-        private const int DIGIT_BITMAP_NORMALIZED_WIDTH = 32;
-        private const int DIGIT_BITMAP_NORMALIZED_HEIGHT = 32;
+        private static int DIGIT_BITMAP_NORMALIZED_WIDTH;
+        private static int DIGIT_BITMAP_NORMALIZED_HEIGHT;
         // If pixel sum value is below this value the pixel is considered to be active
-        private const int ACTIVE_PIXEL_THRESHOLD = 256;
+        private static int ACTIVE_PIXEL_THRESHOLD;
         // Used for clamping pixel values during convertion to grayscale
-        private const float PIXEL_SUM_CLAMP_LOW = 240.0f;
-        private const float PIXEL_SUM_CLAMP_HIGH = 540.0f;
+        private static int PIXEL_SUM_CLAMP_LOW;
+        private static int PIXEL_SUM_CLAMP_HIGH;
 
         // Can't use standard Rectangle, because we don't know width and height until all neighbor pixels are scanned
         // It would be inefficient to re-compute the Rectangle with each neighbor over and over
@@ -53,6 +53,55 @@ namespace BitmapSeparator
             InitializeComponent();
         }
 
+        // Form has loaded
+        private void FormMain_Load(object sender, EventArgs e)
+        {
+            // Load default element toggle settings
+            formElementsToggle(true, false, true);
+
+            // Update processing settings to their initial values
+            trackBarDigitBoundariesAreaThreshold_ValueChanged(this, new EventArgs());
+            textBoxDigitBitmapNormalizedWidth_TextChanged(this, new EventArgs());
+            textBoxDigitBitmapNormalizedHeight_TextChanged(this, new EventArgs());
+
+            trackBarActivePixelThreshold_ValueChanged(this, new EventArgs());
+            textBoxPixelSumClampLow_TextChanged(this, new EventArgs());
+            textBoxPixelSumClampHigh_TextChanged(this, new EventArgs());
+        }
+
+        // Update bitmap processing settings and their labels
+        private void trackBarDigitBoundariesAreaThreshold_ValueChanged(object sender, EventArgs e)
+        {
+            DIGIT_BOUNDARIES_AREA_THRESHOLD = trackBarDigitBoundariesAreaThreshold.Value;
+            labelDigitBoundariesAreaThreshold.Text = "Digit Boundaries Area Threshold: " + DIGIT_BOUNDARIES_AREA_THRESHOLD.ToString();
+        }
+
+        private void textBoxDigitBitmapNormalizedWidth_TextChanged(object sender, EventArgs e)
+        {
+            int.TryParse(textBoxDigitBitmapNormalizedWidth.Text, out DIGIT_BITMAP_NORMALIZED_WIDTH);
+        }
+
+        private void textBoxDigitBitmapNormalizedHeight_TextChanged(object sender, EventArgs e)
+        {
+            int.TryParse(textBoxDigitBitmapNormalizedHeight.Text, out DIGIT_BITMAP_NORMALIZED_HEIGHT);
+        }
+
+        private void trackBarActivePixelThreshold_ValueChanged(object sender, EventArgs e)
+        {
+            ACTIVE_PIXEL_THRESHOLD = trackBarActivePixelThreshold.Value;
+            labelActivePixelThreshold.Text = "Active Pixel Threshold: " + ACTIVE_PIXEL_THRESHOLD.ToString();
+        }
+
+        private void textBoxPixelSumClampLow_TextChanged(object sender, EventArgs e)
+        {
+            int.TryParse(textBoxPixelSumClampLow.Text, out PIXEL_SUM_CLAMP_LOW);
+        }
+
+        private void textBoxPixelSumClampHigh_TextChanged(object sender, EventArgs e)
+        {
+            int.TryParse(textBoxPixelSumClampHigh.Text, out PIXEL_SUM_CLAMP_HIGH);
+        }
+
         // User wants to select a bitmap via openFileDialog
         private void buttonLoadBitmap_Click(object sender, EventArgs e)
         {
@@ -62,7 +111,8 @@ namespace BitmapSeparator
         // Source bitmap file has been selected
         private void openFileDialogBitmap_FileOk(object sender, CancelEventArgs e)
         {
-            buttonProcess.Enabled = true;
+            // Enable the process button
+            formElementsToggle(true, true, true);
         }
 
         // User requeted processing of the selected bitmap
@@ -72,8 +122,14 @@ namespace BitmapSeparator
         }
 
         // Loads the file selected using openFileDialong
-        private static void processBitmap(string strBitmapPath)
+        private void processBitmap(string strBitmapPath)
         {
+            // Disable form elements
+            formElementsToggle(false, false, false);
+            // Re-draw the form to make sure the user sees
+            // all the setting elements as disabled
+            Application.DoEvents();
+
             // Load raw bitmap from file
             using (Bitmap bmpSouceRaw = new Bitmap(strBitmapPath))
             {
@@ -89,10 +145,18 @@ namespace BitmapSeparator
                     // For debugging purposes
                     bmpSourceNormalized.Save("normalized.bmp", ImageFormat.Bmp);
 
+                    // Create the discovered digit counter
+                    // Used to generate unique file name for each sub-bitmap
                     int digitCount = 0;
+
+                    // Since the progress bar updates with every row
+                    // it's maximum has to be set to the highest value
+                    // it can each, which is the height of the bitmap - 1
+                    progressBarBitmapProcessing.Maximum = bmpSourceNormalized.Height - 1;
 
                     // Go through all the pixels row by row and attempt to find all sub-bitmaps
                     for (int y = 0; y < bmpSourceNormalized.Height; y++)
+                    {
                         for (int x = 0; x < bmpSourceNormalized.Width; x++)
                             // If there's an active pixel - dark one simply put
                             if (isActive(bmpSourceNormalized.GetPixel(x, y)))
@@ -102,7 +166,7 @@ namespace BitmapSeparator
 
                                 // Found boundaries must fulfill the requested area threshold
                                 // Smaller area would be unlikely to contain any comprehensive digit
-                                if (rectBounds.Width * rectBounds.Height > DIGIT_BOUNDARIES_THRESHOLD_AREA)
+                                if (rectBounds.Width * rectBounds.Height > DIGIT_BOUNDARIES_AREA_THRESHOLD)
                                 {
                                     // Inflate the boundaries slightly to make sure we've got the whole digit
                                     rectBounds.Inflate(DIGIT_AREA_INFLATION_X, DIGIT_AREA_INFLATION_Y);
@@ -119,6 +183,15 @@ namespace BitmapSeparator
                                 }
                             }
 
+                        // Update the progress bar
+                        progressBarBitmapProcessing.Value = y;
+                        // Make sure the form keeps re-drawing so that the user
+                        // can observe the progress bar as it updates
+                        // It seems that it doesn't even have to be here,
+                        // but I kind of want to make sure it works properly
+                        Application.DoEvents();
+                    }
+
                     // Save the final version of the input bitmap
                     // This exists mostly for the purposes of debugging as there
                     // is no real use to this bitmap after the process is done
@@ -126,6 +199,12 @@ namespace BitmapSeparator
                     bmpSourceNormalized.Save("final.bmp", ImageFormat.Bmp);
                 }
             }
+
+            // Reset the progress bar
+            progressBarBitmapProcessing.Value = 0;
+
+            // Re-enable form elements
+            formElementsToggle(true, true, true);
         }
 
         // Decides whether a pixel is active or not
@@ -220,13 +299,15 @@ namespace BitmapSeparator
             using (Graphics g = Graphics.FromImage(bmpNormalized))
                 g.FillRectangle(new SolidBrush(COLOR_INACTIVE_PIXEL), new Rectangle(0, 0, bmpNormalized.Width, bmpNormalized.Height));
 
+            // Caculate the aspect ratio of the normalized output bitmap
+            float normalizedAspectRatio = (float)DIGIT_BITMAP_NORMALIZED_WIDTH / (float)DIGIT_BITMAP_NORMALIZED_HEIGHT;
             // Figure out the aspect ratio of input bitmap
-            float aspectRatio = (float)bmpInput.Width / (float)bmpInput.Height;
+            float inputAspectRatio = (float)bmpInput.Width / (float)bmpInput.Height;
 
             // Scale width and height, but make sure neither one of them exceeds
             // its normalized size while at least one of them meets its normalized size
-            int scaledWidth = (int)((float)DIGIT_BITMAP_NORMALIZED_WIDTH * (bmpInput.Width >= bmpInput.Height ? 1.0f : aspectRatio));
-            int scaledHeight = (int)((float)DIGIT_BITMAP_NORMALIZED_HEIGHT * (bmpInput.Height >= bmpInput.Width ? 1.0f : aspectRatio));
+            int scaledWidth = (int)(inputAspectRatio >= normalizedAspectRatio ? DIGIT_BITMAP_NORMALIZED_WIDTH : DIGIT_BITMAP_NORMALIZED_HEIGHT * inputAspectRatio);
+            int scaledHeight = (int)(inputAspectRatio <= normalizedAspectRatio ? DIGIT_BITMAP_NORMALIZED_HEIGHT : DIGIT_BITMAP_NORMALIZED_WIDTH / inputAspectRatio);
 
             // Used to store the scaled digit bitmap before it's copied into the normalized bitmap
             // It's necessary because the normalized bitmap has white background which would ruin
@@ -332,6 +413,23 @@ namespace BitmapSeparator
         private static int getPixelSum(Color col)
         {
             return col.R + col.G + col.B;
+        }
+
+        // Enables / disables all modifiable form elements
+        // Used to make sure settings don't change during the process
+        private void formElementsToggle(bool enableLoad, bool enableProcess, bool enableSettings)
+        {
+            trackBarDigitBoundariesAreaThreshold.Enabled = enableSettings;
+            textBoxDigitBitmapNormalizedWidth.Enabled = enableSettings;
+            textBoxDigitBitmapNormalizedHeight.Enabled = enableSettings;
+
+            trackBarActivePixelThreshold.Enabled = enableSettings;
+            textBoxPixelSumClampLow.Enabled = enableSettings;
+            textBoxPixelSumClampHigh.Enabled = enableSettings;
+
+            // Buttons need to be set lastly to ensure one of them keeps the focus
+            buttonLoadBitmap.Enabled = enableLoad;
+            buttonProcess.Enabled = enableProcess;
         }
     }
 }
