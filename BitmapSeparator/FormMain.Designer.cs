@@ -85,7 +85,7 @@
             this.trackBarDigitBoundariesAreaThreshold.SmallChange = 8;
             this.trackBarDigitBoundariesAreaThreshold.TabIndex = 2;
             this.trackBarDigitBoundariesAreaThreshold.TickFrequency = 16;
-            this.trackBarDigitBoundariesAreaThreshold.Value = 64;
+            this.trackBarDigitBoundariesAreaThreshold.Value = 256;
             this.trackBarDigitBoundariesAreaThreshold.ValueChanged += new System.EventHandler(this.trackBarDigitBoundariesAreaThreshold_ValueChanged);
             // 
             // labelDigitBoundariesAreaThreshold
@@ -203,15 +203,15 @@
             // 
             // trackBarActivePixelThreshold
             // 
-            this.trackBarActivePixelThreshold.LargeChange = 128;
+            this.trackBarActivePixelThreshold.LargeChange = 32;
             this.trackBarActivePixelThreshold.Location = new System.Drawing.Point(12, 231);
-            this.trackBarActivePixelThreshold.Maximum = 765;
+            this.trackBarActivePixelThreshold.Maximum = 255;
             this.trackBarActivePixelThreshold.Name = "trackBarActivePixelThreshold";
             this.trackBarActivePixelThreshold.Size = new System.Drawing.Size(260, 45);
-            this.trackBarActivePixelThreshold.SmallChange = 16;
+            this.trackBarActivePixelThreshold.SmallChange = 8;
             this.trackBarActivePixelThreshold.TabIndex = 2;
-            this.trackBarActivePixelThreshold.TickFrequency = 32;
-            this.trackBarActivePixelThreshold.Value = 256;
+            this.trackBarActivePixelThreshold.TickFrequency = 16;
+            this.trackBarActivePixelThreshold.Value = 96;
             this.trackBarActivePixelThreshold.ValueChanged += new System.EventHandler(this.trackBarActivePixelThreshold_ValueChanged);
             // 
             // labelActivePixelThreshold
